@@ -1,0 +1,98 @@
+---
+title: "EDA, power forecasting"
+author: "Boxi Lin"
+date: '2020-02-04'
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+library(readxl)
+library(tidyr)
+library(ggplot2)
+library(dplyr) 
+library(lubridate)
+```
+
+```{r}
+# Hourly: all sectors aggregated 
+#         (residential + industrial + commercial/institutional + agriculture + transportation)
+h_usage <-read_excel("data/SSC2020_hourly_demand.xlsx",2)
+
+# Annualy:  (residential: s.heat, w.heat, appliance, light, s.cooling
+#            industrial, commercial/institutional, agriculture, transportation)
+y_usage <-read.csv("data/ssc2020_annual_demand.csv")
+
+# Hourly:
+h_weather <- read_excel("data/ssc2020_hourly_weather.xlsx",2)
+names(h_usage)<-c("date", "hour","y", "year","month")
+n_year = 14
+```
+
+
+```{r}
+### Annual power usage
+
+y_stack <- tidyr::gather(y_usage,"Sectors", "Usage",3:11) %>% 
+  mutate(Sectors = factor(Sectors, levels = rev(unique(Sectors))))
+ggplot(y_stack, aes(x=Year, y=Usage, fill=Sectors)) + 
+  geom_area()+
+  geom_text(data = y_stack, aes(x = Year, y = Residential), label=y_stack$Residential,size = 3)+
+  scale_x_continuous("Year", labels = as.character(2003:2016), breaks = 2003:2016)+
+  ggtitle("Annual power usage")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r, fig.height=9}
+### Hourly usage data
+par(mfrow = c(3,1))
+d_usage <- h_usage %>% filter(date==pull(h_usage, date)[4290])
+plot(d_usage$hour,d_usage$y, type = "l", main = "Daily usage, 2003-06-28", xlab = "hour")
+m_usage <- h_usage %>% filter(year==d_usage$year & month==d_usage$month)
+plot(1:720,m_usage$y, type = "l", main = "Monthly usage, 2003-6", xlab = "",xaxt="n")
+axis(1, at= seq(0,700,24)+12,labels=m_usage$date[seq(0,700,24)+12], col.axis="black", las = 2)
+abline(v = c(649,672), col = "red")
+a_usage <- h_usage %>% filter(year==d_usage$year)
+plot(1:8760, a_usage$y, type = "l", main = "Annual usage, 2003", xlab = "",xaxt="n")
+axis(1, at=  cumsum(as.numeric(table(a_usage$month)))-15*24,labels=1:12, col.axis="black", las = 2)
+abline(v = c(3625,4344), col = "red")
+```
+
+```{r}
+### Daily usage
+
+h_usage <- h_usage %>% mutate(season = ifelse(month %in% 9:11, "Fall", ifelse(month %in% 6:8, "Summer", ifelse(month %in% c(12,1:3),"Winter","Spring"))))
+ggplot(data=h_usage[h_usage$year=="2012",],aes(hour,y,color=season,group=date)) + 
+  geom_line(alpha=0.35)+ ggtitle("Daily usage by season, 2012")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+```{r, fig.height=10,fig.width=10}
+
+### Hourly Weather 
+par(mfrow = c(4,2))
+a_weather <- h_weather %>% filter( year(h_weather$time)==d_usage$year)
+plot(1:8760, a_weather$precipitation, cex = .2, main = "Weather: Precipitation, 2003", xlab = "",xaxt="n")
+axis(1, at=  cumsum(as.numeric(table(a_usage$month)))-15*24,labels=1:12, col.axis="black")
+plot(1:8760, a_weather$temperature, cex = .2, main = "Weather: Temperature, 2003", xlab = "",xaxt="n")
+axis(1, at=  cumsum(as.numeric(table(a_usage$month)))-15*24,labels=1:12, col.axis="black")
+plot(1:8760, a_weather$irradiance_surface, cex = .2, main = "Weather: Irradiance_surface, 2003", xlab = "",xaxt="n")
+axis(1, at=  cumsum(as.numeric(table(a_usage$month)))-15*24,labels=1:12, col.axis="black")
+plot(1:8760, a_weather$irradiance_toa, cex= .2, main = "Weather: irradiance_toa, 2003", xlab = "",xaxt="n")
+axis(1, at=  cumsum(as.numeric(table(a_usage$month)))-15*24,labels=1:12, col.axis="black")
+
+plot(1:8760, a_weather$snowfall, cex = .2, main = "Weather: Temperature, 2003", xlab = "",xaxt="n")
+axis(1, at=  cumsum(as.numeric(table(a_usage$month)))-15*24,labels=1:12, col.axis="black")
+plot(1:8760, a_weather$snow_depth, cex = .2, main = "Weather: snowfall, 2003", xlab = "",xaxt="n")
+axis(1, at=  cumsum(as.numeric(table(a_usage$month)))-15*24,labels=1:12, col.axis="black")
+plot(1:8760, a_weather$cloud_cover, cex = .2, main = "Weather: cloud_cover, 2003", xlab = "",xaxt="n")
+axis(1, at=  cumsum(as.numeric(table(a_usage$month)))-15*24,labels=1:12, col.axis="black")
+plot(1:8760, a_weather$air_density, cex = .2, main = "Weather: air_density, 2003", xlab = "",xaxt="n")
+axis(1, at=  cumsum(as.numeric(table(a_usage$month)))-15*24,labels=1:12, col.axis="black")
+```
